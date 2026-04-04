@@ -2,12 +2,12 @@
 FROM ghcr.io/pi-hole/pihole:latest
 
 # Install necessary programs without repository caching
-RUN apk update --no-cache && \
-    apk upgrade --no-cache \
+RUN apk update \
+    apk upgrade --no-cache && \
     apk add --no-cache \
-    unbound \ 
-    nano \ 
-    net-tools \     
+    unbound \
+    nano \
+    net-tools \
     wget
 
 # Additional configs
