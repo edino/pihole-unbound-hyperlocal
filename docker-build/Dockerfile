@@ -1,10 +1,13 @@
 # Get the latest Pi-hole version
-FROM ghcr.io/pi-hole/pihole:2026.02.0
+FROM ghcr.io/pi-hole/pihole:latest
 
 # Install necessary programs without repository caching
-RUN apk upgrade --no-cache && \
+RUN apk update --no-cache && \
+    apk upgrade --no-cache \
     apk add --no-cache \
     unbound \ 
+    nano \ 
+    net-tools \     
     wget
 
 # Additional configs
