@@ -27,7 +27,8 @@ COPY unbound-pihole.conf /etc/unbound/unbound.conf.d/pihole.conf
 COPY 99-edns.conf /etc/dnsmasq.d/99-edns.conf
 
 # 4. LAZARUS TCP FORTIFICATION
-RUN printf 'server:\n  incoming-num-tcp: 1024\n  do-tcp: yes\n  tcp-idle-timeout: 30000\n' > /etc/unbound/unbound.conf.d/99-tcp-fix.conf
+#RUN printf 'server:\n  incoming-num-tcp: 1024\n  do-tcp: yes\n  tcp-idle-timeout: 30000\n' > /etc/unbound/unbound.conf.d/99-tcp-fix.conf
+#Change was made directly into the unbound-pihole.conf.
 
 # 5. UI THERMAL PATCH
 RUN sed -i 's|<p>Status</p>||g' /var/www/html/admin/scripts/lua/sidebar.lp && \
