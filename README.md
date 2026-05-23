@@ -1,114 +1,72 @@
-# Pihole + Unbound + Hyperlocal
+# 🛡️ Pi-hole + Unbound + Hyperlocal (Hardened Homelab Edition)
 
-> [!NOTE]
->
-> **IMPORTANT**: When using this Docker image, please report any bugs or suggestions to this repository directly.
+> [!NOTE]  
+> **Protocol v4.1 Active:** This is a customized fork of the excellent [sujiba/pihole-unbound-hyperlocal](https://github.com/sujiba/pihole-unbound-hyperlocal) repository, specifically hardened for AMD64/x86_64 environments. It implements strict Layer 2 Privacy (QNAME Minimisation), TCP connection fortification, and native Traefik v3 reverse proxy integration.
 
+## 🚀 Upgrade Notes & Architecture
 
-## Upgrade Notes
-
-> [!CAUTION]
+> [!CAUTION]  
+> ## 🚨 V6 ARCHITECTURE & BREAKING CHANGES
+> **Pi-hole v6 has been entirely redesigned from the ground up.** It replaces lighttpd with a native webserver and introduces a REST API. This repository preserves the v6 transition while adding severe privacy constraints to the Unbound recursive resolver.
 > 
-> ## !!! THE LATEST VERSION CONTAINS BREAKING CHANGES
->
-> **Pi-hole v6 has been entirely redesigned from the ground up and contains many breaking changes.**
-> 
-> Read https://github.com/pi-hole/docker-pi-hole
+> *Read upstream docs: [Docker Pi-hole v6](https://github.com/pi-hole/docker-pi-hole)*
 
-> [!tip]
-> Firstly pull the new image with `docker pull ghcr.io/sujiba/pihole-unbound-hyperlocal:latest`.
-> Next stop the old container with `docker compose down`. 
-> Follow the steps described under [First startup](#first-startup). 
-> For the upgrade transition you're going to have two folders
-> - old: pihole-unbound-hyperlocal
-> - new: pihole-unbound-hyperlocal-v6
-> 
-> You can delete the old folder if everything is up and running.
+### The Hardened Upgrades
+* **Layer 2 Privacy:** Native integration of RFC 7816 (QNAME Minimisation) and RFC 8020 (NXDOMAIN Hardening).
+* **TCP Fortification:** Injected `incoming-num-tcp: 1024` and `tcp-idle-timeout: 30000` to prevent Pi-hole/FTL and Unbound from clashing over dropped connections.
+* **Decentralized Recursion:** Fully independent DNS resolution. We do not use Cloudflare or Google. We query the Global Root Servers directly, but obfuscate the payload to prevent tracking.
 
-## Overview
+---
 
-- [Pihole + Unbound + Hyperlocal](#pihole--unbound--hyperlocal)
-  - [Overview](#overview)
-  - [Acknowledgement](#acknowledgement)
-  - [Introduction](#introduction)
-  - [Prerequisites](#prerequisites)
-  - [First startup](#first-startup)
-    - [Testing](#testing)
-  - [DNS problems](#dns-problems)
-  - [Blocklists](#blocklists)
+## 📚 Navigation
 
-## Acknowledgement
+- [Acknowledgements](#acknowledgements)
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [First Startup (Deployment)](#first-startup-deployment)
+  - [Testing the DNSSEC Chain](#testing-the-dnssec-chain)
+- [The Privacy Architecture (Unbound)](#the-privacy-architecture-unbound)
+- [DNS Problems (Host Resolution)](#dns-problems-host-resolution)
+- [Recommended Blocklists](#recommended-blocklists)
+
+---
+
+## 🤝 Acknowledgements
+This architecture is built upon the incredible work of the open-source community:
+- [sujiba/pihole-unbound-hyperlocal](https://github.com/sujiba/pihole-unbound-hyperlocal) (The primary upstream foundation)
 - [Docker Pi-hole](https://github.com/pi-hole/docker-pi-hole)
-- [Unbound](https://nlnetlabs.nl/projects/unbound/about/)
-- [Pi-hole Unbound](https://docs.pi-hole.net/guides/dns/unbound/)
+- [Unbound DNS](https://nlnetlabs.nl/projects/unbound/about/)
+- [Pi-hole Unbound Guide](https://docs.pi-hole.net/guides/dns/unbound/)
 - [mpgirro/docker-pihole-unbound](https://github.com/mpgirro/docker-pihole-unbound)
-- [Pi-hole: Einrichtung und Konfiguration mit unbound – AdBlocker Teil2](https://www.kuketz-blog.de/pi-hole-einrichtung-und-konfiguration-mit-unbound-adblocker-teil2/)
 
-## Introduction
-**Pi-hole**:
-- Pi-hole is a DNS sinkhole that protects your devices from unwanted content, without installing any client-side software.
+---
 
-**Unbound**:
-- Unbound is a validating, recursive, caching DNS resolver. It is designed to be fast and lean and incorporates modern features based on open standards. 
+## 📖 Introduction
 
-**Hyperlocal**:
-- To spare the initial DNS query to the DNS-Root-Servers by Unbound, we provide Unbound with an appropriate configuration. With each Pi-hole update, the DNS-Root-Zone (root.hints) is also updated. 
+**Pi-hole:**
+Acts as the network-wide DNS sinkhole, protecting devices from unwanted content, telemetry, and tracking without requiring client-side software.
 
-## Prerequisites
-- Install [Docker](https://docs.docker.com/get-docker/)
-- Install [Docker-Compose](https://docs.docker.com/compose/install/)
+**Unbound:**
+A validating, recursive, and caching DNS resolver. Instead of handing your entire browsing history to an upstream provider (like Google 8.8.8.8), Unbound mathematically traverses the global internet hierarchy to find IP addresses independently.
 
-## First startup
-Clone the repository to your favored location and change the config.
-```
-git clone -b main https://github.com/sujiba/pihole-unbound-hyperlocal.git pihole-unbound-hyperlocal-v6
+**Hyperlocal (Root Hints):**
+To accelerate resolution, the container is pre-packaged with the DNS Root Zone (`root.hints`). Unbound uses this local cache to contact the global root servers directly without needing a third party to locate them.
 
-# Change the timezone, password and other pi-hole settings
-cp example.pihole.env pihole.env
-vi pihole.env
+---
 
-# Change the ports if you're running a reverse proxy on ports 80 and 443
-vi docker-compose.yml
-```
+## 🛠️ Prerequisites
+- An AMD64/x86_64 host node.
+- [Docker Engine](https://docs.docker.com/get-docker/) & Docker Compose.
+- An existing Docker external network (e.g., `pihole_default`) managed by a Reverse Proxy (e.g., Traefik).
 
-Start the container
-```
-docker compose up -d
-```
+---
 
-Check the logs
-```
-docker compose logs -f
-```
+## 💻 First Startup (Deployment)
 
-### Testing
-```
-docker compose exec -it pihole-unbound sh
-dig github.com @127.0.0.1 +short
-dig sigfail.verteiltesysteme.net @127.0.0.1 | grep status 
-dig sigok.verteiltesysteme.net @127.0.0.1 | grep status
-```
-- First dig should show an IP address
-- Second dig should show status: SERVFAIL
-- Last dig should show status: NOERROR
+To deploy the hardened image, execute the following steps on your host machine.
 
-## DNS problems
-If you are running other docker containers on the same host and cannot use name resolution within these containers, you have to modify /etc/resolvconf.conf on your host system and uncomment the following:
-```
-# If you run a local name server, you should uncomment the below line and
-# configure your subscribers configuration files below.
-name_servers=127.0.0.1
-```
-Write the changes to your resolv.conf:
-```
-sudo resolvconf -u
-```
-See also [StackExchange](https://unix.stackexchange.com/questions/647996/docker-container-dns-not-working-with-pihole)
-
-## Blocklists
-- [Firebog Non-crossed lists](https://v.firebog.net/hosts/lists.php?type=nocross)
-- [x0uid SpotifyAdBlock](https://raw.githubusercontent.com/x0uid/SpotifyAdBlock/master/SpotifyBlocklist.txt)
-- [Perflyst SmartTV](https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/SmartTV.txt)
-- [mmotti Pi-hole RegEx](https://raw.githubusercontent.com/mmotti/pihole-regex/master/regex.list)
-- [Privacy-Handbuch Windows 10 Telemetry](https://www.privacy-handbuch.de/handbuch_90a2.htm)
-- [hagezi dns-blocklists](https://github.com/hagezi/dns-blocklists)
+### 1. Directory Preparation
+Create the persistent volume paths on the host to ensure Pi-hole retains its database across container reboots.
+```bash
+mkdir -p /opt/docker/pihole/etc/{dnsmasq.d,pihole}
+sudo chown -R 1000:1000 /opt/docker/pihole
